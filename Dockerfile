@@ -1,5 +1,5 @@
 # Go 编译环境
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26.5-alpine AS builder
 
 WORKDIR /app
 
