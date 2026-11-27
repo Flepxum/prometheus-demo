@@ -1,0 +1,49 @@
+
+name: Go Prometheus CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 安装 Go
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # 3. 下载依赖
+      - name: Download dependencies
+        run: go mod download
+
+      # 4. 单元测试
+      - name: Run tests
+        run: go test -v ./...
+
+      # 5. 代码检查
+      - name: Run vet
+        run: go vet ./...
+
+      # 6. 编译
+      - name: Build
+        run: go build -v -o prometheus-demo .
+
+      # 7. Docker 镜像构建（可选）
+      - name: Build Docker image
+        run: docker build -t prometheus-demo:latest .
