@@ -1,19 +1,22 @@
-# Go 编译环境
-FROM golang:1.26.5-alpine AS builder
+
+# 使用构建机器本身的架构编译 Go
+FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app
 
-# 先复制依赖文件，利用 Docker 缓存
 COPY go.mod go.sum ./
 RUN go mod download
 
-# 复制源代码
 COPY . .
 
-# 编译 Linux 可执行文件
-RUN CGO_ENABLED=0 GOOS=linux go build -o prometheus-demo .
+# 根据目标架构编译
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -o prometheus-demo .
 
-# 运行环境
+# 最终运行环境
 FROM alpine:3.22
 
 WORKDIR /app
