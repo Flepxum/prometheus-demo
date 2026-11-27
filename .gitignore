@@ -1,0 +1,36 @@
+# Go 编译产物
+*.exe
+*.out
+*.test
+prometheus-demo
+
+# 环境配置
+.env
+.env.example
+.env.local
+
+# 日志
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Docker
+*.tar
+*.tar.gz
+
+# 临时文件
+tmp/
+temp/
+
+# Grafana 数据（如果使用本地目录存储）
+grafana-data/
+grafana/
+
+# Prometheus 数据
+prometheus-data/
