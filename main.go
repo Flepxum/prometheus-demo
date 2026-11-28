@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"runtime"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"os/signal"
+	"syscall"
 )
 
 var (
@@ -71,14 +74,17 @@ func init() {
 }
 
 // 定时采集内存使用量
-func collectMemory() {
+func collectMemory(stop <-chan struct{}) {
 	ticker := time.NewTicker(5 * time.Second)
 
 	go func() {
-		for range ticker.C {
+		select {
+		case <-stop:
+			ticker.Stop()
+			return
+		case <-ticker.C:
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
-
 			memoryGauge.Set(float64(m.Alloc))
 			memoryGauge2.WithLabelValues("my_service", "instance_1").Set(float64(m.Alloc) / 1024 / 1024) // 转换为 MB
 		}
@@ -111,18 +117,36 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	collectMemory()
-
-	// 业务接口
-	http.HandleFunc("/hello", helloHandler)
-
+	stop := make(chan struct{})
+	defer close(stop)
+	collectMemory(stop)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hello", helloHandler)
 	// Prometheus 指标接口
-	http.Handle(
-		"/metrics",
-		promhttp.Handler(),
-	)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	log.Println("Server listening on :8080")
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	quit := make(chan os.Signal, 1)
+	go func() {
+		// service connections
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	<-quit
+	log.Println("Shutdown Server ...")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server Shutdown Failed:%+v", err)
+	}
+	log.Println("Server exited properly")
 }
